@@ -167,18 +167,16 @@ const TaskManager = ({ onlineList, loggedIn }) => {
       setTasks(payload.tasks);
       setPageInfo(payload.pageInfo);
 
-      if (client.connected) {
-        if (tasks.length !== 0) {
-          for (const { id } of tasks) {
-            client.unsubscribe(String(id));
-            console.log(`Unsubscribing to ${filter} task: ${id}`);
-          }
+      if (tasks.length !== 0) {
+        for (const { id } of tasks) {
+          client.unsubscribe(String(id));
+          console.log(`Unsubscribing to ${filter} task: ${id}`);
         }
+      }
 
-        for (const { id } of payload.tasks) {
-          client.subscribe(String(id), { qos: 2 });
-          console.log(`Subscribing to ${filter} task: ${id}`);
-        }
+      for (const { id } of payload.tasks) {
+        client.subscribe(String(id), { qos: 2 });
+        console.log(`Subscribing to ${filter} task: ${id}`);
       }
     });
   };
