@@ -34,6 +34,19 @@ passport.use(
   )
 );
 
+module.exports.logoutUser = function logoutUser(req, res, next) {
+  const userId = req.user;
+  Users.getUserById(userId).then((user) => {
+    // notify all clients that a user has logged out from the service
+    const logoutMessage = new WSMessage("logout", user.id, user.name);
+    WebSocket.sendAllClients(logoutMessage);
+    WebSocket.deleteMessage(user.id);
+    //clear the cookie
+    req.logout();
+    res.clearCookie("jwt").end();
+  });
+};
+
 module.exports.authenticateUser = function authenticateUser(req, res, next) {
   if (req.query.type == "login") {
     passport.authenticate("local", { session: false }, (err, user, info) => {
@@ -64,39 +77,11 @@ module.exports.authenticateUser = function authenticateUser(req, res, next) {
         });
       });
     })(req, res, next);
-  } else if (req.query.type == "logout") {
-    const email = req.body.email;
-    Users.getUserByEmail(email).then((user) => {
-      if (user === undefined) {
-        utils.writeJson(
-          res,
-          { errors: [{ param: "Server", msg: "Invalid e-mail" }] },
-          404
-        );
-      } else {
-        //notify all clients that a user has logged out from the service
-        var logoutMessage = new WSMessage("logout", user.id, user.name);
-        WebSocket.sendAllClients(logoutMessage);
-        WebSocket.deleteMessage(user.id);
-        //clear the cookie
-        req.logout();
-        res.clearCookie("jwt").end();
-      }
-    });
-  } else {
-    utils.writeJson(
-      res,
-      {
-        errors: [
-          {
-            param: "Server",
-            msg: "value for the query parameter not accepted",
-          },
-        ],
-      },
-      400
-    );
   }
+};
+
+module.exports.isUserAuthenticated = function isUserAuthenticated(req, res) {
+  Users.getUserById(req.user).then((user) => utils.writeJson(res, user));
 };
 
 module.exports.getUsers = function getUsers(req, res, next) {

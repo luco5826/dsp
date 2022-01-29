@@ -1,17 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Col } from "react-bootstrap";
 import API from "../API";
 import Assignments from "../components/Assignments";
 import MiniOnlineList from "../components/MiniOnlineList";
+import UserContext from "../contexts/UserContext";
 
 const AssignmentsManager = ({ onlineList }) => {
   const [userList, setUserList] = useState([]);
   const [ownedTasks, setOwnedTasks] = useState([]);
 
+  const user = useContext(UserContext);
+
   useEffect(() => {
     API.getUsers().then((users) => setUserList(users));
-    API.getAllOwnedTasks().then((tasks) => setOwnedTasks(tasks));
-  }, []);
+    API.getAllOwnedTasks(user.id).then((tasks) => setOwnedTasks(tasks));
+  }, [user.id]);
 
   const assignTask = async (userId, taskIdList) => {
     taskIdList.forEach(async (tId) => {

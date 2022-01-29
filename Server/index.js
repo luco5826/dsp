@@ -59,6 +59,16 @@ passport.use(
 //route methods
 
 app.post("/api/users/authenticator", userController.authenticateUser);
+app.get(
+  "/api/users/authenticator/logout",
+  passport.authenticate("jwt", { session: false }),
+  userController.logoutUser
+);
+app.get(
+  "/api/users/authenticator",
+  passport.authenticate("jwt", { session: false }),
+  userController.isUserAuthenticated
+);
 app.get("/api/tasks/public", taskController.getPublicTasks);
 app.post(
   "/api/tasks",
@@ -133,8 +143,6 @@ app.put(
   passport.authenticate("jwt", { session: false }),
   assignmentController.selectTask
 );
-
-
 
 // Error handlers for validation and authentication errors
 

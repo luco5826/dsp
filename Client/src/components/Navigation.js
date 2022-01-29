@@ -1,7 +1,7 @@
-import { Navbar, Nav, Form, Button } from "react-bootstrap/";
+import { Navbar, Nav, Form } from "react-bootstrap";
 import { CheckAll } from "react-bootstrap-icons";
 import { LogoutButton } from "./Login";
-import { Link, NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 const Navigation = (props) => {
   const { onLogOut, loggedIn, user } = props;
@@ -26,9 +26,11 @@ const Navigation = (props) => {
           {user && user.name && `Welcome, ${user?.name}!`}
         </Navbar.Text>
         <Form inline className="mx-2">
-          {loggedIn ? <LogoutButton logout={onLogOut} /> :
+          {loggedIn ? (
+            <LogoutButton logout={onLogOut} />
+          ) : (
             <NavLink to="/login">Login</NavLink>
-          }
+          )}
         </Form>
       </Nav>
     </Navbar>

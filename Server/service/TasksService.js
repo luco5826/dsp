@@ -336,7 +336,8 @@ exports.getAssignedTasksTotal = function (req) {
  **/
 exports.updateSingleTask = function (task, taskId, owner) {
   return new Promise((resolve, reject) => {
-    var status = "";
+    let status = "other";
+    let operation = "UPDATE";
     db.all(
       recurringQueries.GET_OWNER_BY_TASK_ID,
       [taskId],
@@ -362,6 +363,7 @@ exports.updateSingleTask = function (task, taskId, owner) {
             sql3 = sql3.concat(", private = ?");
             parameters.push(task.private);
             status = task.private ? "private" : "public";
+            operation = task.private ? "DELETE" : "CREATE";
           }
           if (task.project != undefined) {
             sql3 = sql3.concat(", project = ?");
@@ -377,21 +379,20 @@ exports.updateSingleTask = function (task, taskId, owner) {
           db.run(sql3, parameters, (err) => {
             if (err) return reject(err);
 
-            if (status === "") status = "other";
-            var message = new MQTTMessage(
-              "UPDATE",
+            const message = new MQTTMessage(
+              operation,
               status,
               owner,
               null,
               task.id,
               task
             );
-            //console.log("Message that will be sent:", message)
-            if (status === "public")
-              // if the task is now public, send message to publicTask topic
-              mqtt.publishTaskMessage("publicTasks", message);
-            // Send message to topic of task's ID
-            else mqtt.publishTaskMessage(String(task.id), message);
+
+            mqtt.publishTaskMessage(
+              status === "public" ? "publicTasks" : String(task.id),
+              message
+            );
+
             resolve(null);
           });
         });

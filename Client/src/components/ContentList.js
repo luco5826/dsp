@@ -85,7 +85,6 @@ const ContentList = ({
   onComplete,
   filter,
   onPageChange,
-  assignedTaskList,
 }) => {
   const handlePageChange = (page) => {
     onPageChange(filter, page);
@@ -106,13 +105,7 @@ const ContentList = ({
                 console.log("Selected task:" + task);
               }}
               filter={filter}
-              owner={
-                filter === "assigned"
-                  ? assignedTaskList.filter(
-                      (t) => String(t.taskId) === String(task.id)
-                    )[0]?.userName
-                  : ""
-              }
+              owner={""}
             />
             <TaskRowControl
               task={task}

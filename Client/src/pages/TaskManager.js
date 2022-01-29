@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import { Button, Col } from "react-bootstrap";
 import { useHistory, useParams } from "react-router";
 import API from "../API";
@@ -6,11 +6,14 @@ import ContentList from "../components/ContentList";
 import Filters from "../components/Filters";
 import MiniOnlineList from "../components/MiniOnlineList";
 import ModalForm from "../components/ModalForm";
+import UserContext from "../contexts/UserContext";
 import dayjs from "dayjs";
+import mqtt from "mqtt";
 
-var mqtt = require("mqtt");
-var clientId = "mqttjs_" + Math.random().toString(16).substr(2, 8);
-var options = {
+const host = "ws://127.0.0.1:8080";
+
+const clientId = "mqttjs_" + Math.random().toString(16).substring(2, 8);
+const options = {
   keepalive: 30,
   clientId: clientId,
   clean: true,
@@ -24,17 +27,15 @@ var options = {
   },
   rejectUnauthorized: false,
 };
-var host = "ws://127.0.0.1:8080";
-var client = mqtt.connect(host, options);
+
+const client = mqtt.connect(host, options);
 const filters = {
   owned: { label: "Owned Tasks", id: "owned" },
   assigned: { label: "Assigned Tasks", id: "assigned" },
   public: { label: "Public Tasks", id: "public" },
 };
-const EventEmitter = require("events");
-const handler = new EventEmitter();
 
-const TaskManager = ({ onCheck, onlineList, loggedIn }) => {
+const TaskManager = ({ onlineList, loggedIn }) => {
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(undefined);
   const [pageInfo, setPageInfo] = useState({
@@ -42,266 +43,141 @@ const TaskManager = ({ onCheck, onlineList, loggedIn }) => {
     totalPages: 0,
     currentPage: 1,
   });
-  const [refetchTasks, setRefetchTasks] = useState(false);
-  const [assignedTaskList, setAssignedTaskList] = useState([]);
-  const [ownedTaskList, setOwnedTaskList] = useState([]);
-  const [publicTask, setPublicTask] = useState([]);
-  const [newMessage, setNewMessage] = useState(false);
   const [parsedMessage, setParsedMessage] = useState(undefined);
-  const [topic, setTopic] = useState("");
+
   const history = useHistory();
   const { filter } = useParams();
 
+  const user = useContext(UserContext);
+
   useEffect(() => {
-    if (newMessage && parsedMessage !== undefined) {
-      switch (parsedMessage.operation) {
-        case "CREATE":
-          if (history.location.pathname.includes("public")) {
-            if (tasks.length === 10) {
-              setPageInfo((oldInfos) => {
-                oldInfos.totalItems += 1;
-                return { ...oldInfos };
-              });
-            } else {
-              const task = Object.assign({}, parsedMessage.payload, {
-                deadline:
-                  parsedMessage.payload.deadline &&
-                  dayjs(parsedMessage.payload.deadline),
-              });
-              setTasks((oldList) => [...tasks, task]);
-            }
-          }
-          // Subscribe to receive update of the newer task
-          console.log("Subscribing to ", String(parsedMessage.taskId));
-          client.subscribe(String(parsedMessage.taskId), { qos: 2 });
-          break;
-        case "DELETE":
-          console.log("Unsubscribing to ", topic);
-          client.unsubscribe(topic);
-          setTasks((oldList) => {
-            if (history.location.pathname.includes("public")) {
-              var tempList = oldList.filter(
-                (t) => t.id !== parseInt(parsedMessage.taskId)
-              );
-              console.log(
-                "Old task list:",
-                oldList,
-                " new Task List:",
-                tempList,
-                " filter:",
-                history.location.pathname
-              );
-              return tempList;
-            } else return oldList;
-          });
+    if (parsedMessage === undefined) return;
 
-          break;
-        case "UPDATE":
-          if (
-            parsedMessage.status === "active" ||
-            parsedMessage.status === "inactive"
-          ) {
-            // Selection/Deselection of task
-            var index = tasks.findIndex((x) => x.taskId === parseInt(topic));
-            let objectStatus = {
-              taskId: parseInt(topic),
-              userName: parsedMessage.userName,
-              status: parsedMessage.status,
-            };
-            var temp = tasks;
-            index === -1
-              ? temp.push(objectStatus)
-              : (temp[index] = objectStatus);
+    const { topic } = parsedMessage;
 
-            setAssignedTaskList(temp);
-          } else if (parsedMessage.status === "public") {
-            // Task has been changed to public
-            // setTasks(tempList);
-            // setPublicTask(tempList);
-            setTasks((oldList) => {
-              if (history.location.pathname.includes("public")) {
-                console.log(
-                  "Task ",
-                  String(parsedMessage.taskId),
-                  " now is public"
-                );
-                const task = Object.assign({}, parsedMessage.payload, {
-                  deadline:
-                    parsedMessage.payload.deadline &&
-                    dayjs(parsedMessage.payload.deadline),
-                });
-                var tempList = oldList.filter(
-                  (t) => t.id !== parseInt(task.id)
-                );
-                tempList.push(task);
-                console.log(
-                  "Old task list:",
-                  oldList,
-                  " new Task List:",
-                  tempList,
-                  " filter:",
-                  history.location.pathname
-                );
-                return tempList;
-              } else return oldList;
+    switch (parsedMessage.operation) {
+      case "CREATE":
+        if (filter === "public") {
+          if (tasks.length === 10) {
+            // Cannot display the task in the current page, update just the pagination
+            setPageInfo((oldInfos) => {
+              return { ...oldInfos, totalItems: oldInfos.totalItems + 1 };
             });
-
-            console.log(
-              "Subscribing to task public ",
-              String(parsedMessage.taskId)
-            );
-            client.subscribe(String(parsedMessage.taskId), { qos: 2 });
-          } else if (
-            parsedMessage.status === "private" &&
-            history.location.pathname.includes("public")
-          ) {
-            // Task has been changed to private
-            setTasks((oldList) => {
-              if (history.location.pathname.includes("public")) {
-                console.log("Task ", topic, " now is private");
-                var tempList = oldList.filter(
-                  (t) => t.id !== parseInt(parsedMessage.taskId)
-                );
-                console.log(
-                  "Old task list:",
-                  oldList,
-                  " new Task List:",
-                  tempList,
-                  " filter:",
-                  history.location.pathname
-                );
-
-                return tempList;
-              } else return oldList;
-            });
-            console.log("Unsubscribing from private task ", topic);
-            client.unsubscribe(String(topic));
-            // setTasks(tempList);
           } else {
-            // Other update operation
-
-            // Check if the task is public
-            if (
-              !parsedMessage.payload.private &&
-              history.location.pathname.includes("public")
-            ) {
-              console.log("Task ", topic, " has been updated");
-
-              setTasks((oldList) => {
-                if (history.location.pathname.includes("public")) {
-                  const task = Object.assign({}, parsedMessage.payload, {
-                    deadline:
-                      parsedMessage.payload.deadline &&
-                      dayjs(parsedMessage.payload.deadline),
-                  });
-                  var tempList = oldList.filter(
-                    (t) => t.id !== parseInt(task.id)
-                  );
-                  console.log(tempList);
-                  //Insert updated task
-                  tempList.push(task);
-                  console.log(
-                    "Old task list:",
-                    oldList,
-                    " new Task List:",
-                    tempList,
-                    " filter:",
-                    history.location.pathname
-                  );
-                  return tempList;
-                } else return oldList;
-              });
-            }
+            setTasks([...tasks, parsedMessage.payload]);
           }
-          break;
-        default:
-          break;
-      }
-      setNewMessage(false);
-      setParsedMessage(undefined);
-      setTopic("");
-    }
-  }, [newMessage, parsedMessage]);
+        }
 
-  useEffect(() => {
-    onPageChange(filter, 1);
-  }, [filter]);
-
-  useEffect(() => {
-    // MQTT
-    client.on("error", (err) => {
-      console.log(err);
-      client.end();
-    });
-
-    client.on("connect", () => {
-      console.log("Client connected " + clientId);
-      console.log("Subscribing to publicTasks");
-      client.subscribe("publicTasks", { qos: 2, retain: true });
-    });
-
-    client.on("message", (topic, message, packet) => {
-      try {
-        // console.log("MQTT message: " + message.toString() + " from topic: " + topic);
-        const payload = JSON.parse(message);
-        setNewMessage(true);
-        setParsedMessage(payload);
-        setTopic(topic);
-        // displayTaskUpdating(topic, parsedMessage);
-      } catch (err) {
-        console.log("Message that caused error: " + message.toString());
-        console.log(err);
-      }
-    });
-
-    client.on("close", () => {
-      console.log(`Client ${clientId} disconnected `);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (refetchTasks) {
-      API.getTasks(filter).then((payload) => {
-        setTasks(payload.tasks);
-        setPageInfo(payload.pageInfo);
-        setRefetchTasks(false);
-      });
-    }
-  }, [filter, refetchTasks]);
-
-  const updateCorrectTaskList = (filter, tasks) => {
-    switch (filter) {
-      case "owned":
-        setOwnedTaskList(tasks);
+        // Subscribe to receive update of the newer task
+        console.log("TASK CREATED::Subscribing to task:", parsedMessage.taskId);
+        client.subscribe(parsedMessage.taskId.toString(), { qos: 2 });
         break;
+      case "DELETE":
+        console.log("TASK DELETED::Unsubscribing from:", topic);
+        client.unsubscribe(topic);
+        if (filter === "public") {
+          setTasks(
+            tasks.filter((t) => t.id !== Number.parseInt(parsedMessage.taskId))
+          );
+        }
+        break;
+      case "UPDATE":
+        console.log("TASK UPDATED::", parsedMessage.taskId);
+        if (
+          parsedMessage.status === "active" ||
+          parsedMessage.status === "inactive"
+        ) {
+          // Selection/Deselection of task
+          var index = tasks.findIndex((x) => x.taskId === parseInt(topic));
+          let objectStatus = {
+            taskId: parseInt(topic),
+            userName: parsedMessage.userName,
+            status: parsedMessage.status,
+          };
+          var temp = tasks;
+          index === -1 ? temp.push(objectStatus) : (temp[index] = objectStatus);
 
-      case "public":
-        setPublicTask(tasks);
+          setTasks(temp);
+        } else {
+          // Check if the task is public
+          // prettier-ignore
+          if (filter === "public") {
+            const updatedTask = parsedMessage.payload;
+
+            // Update the task in place so that the list does not get rerendered
+            const targetTask = tasks.find((t) => t.id === Number.parseInt(updatedTask.id));
+            for (const key in targetTask) {
+              targetTask[key] = updatedTask[key];
+            }
+            setTasks([...tasks]);
+          }
+        }
         break;
       default:
         break;
     }
-  };
+    setParsedMessage(undefined);
+  }, [parsedMessage, filter, tasks]);
+
+  useEffect(() => {
+    onPageChange(filter, 1);
+    // eslint-disable-next-line
+  }, [filter, user]);
+
+  /**
+   * MQTT setup phase
+   */
+  useEffect(() => {
+    client.on("error", (err) => {
+      console.error(err);
+      client.end();
+    });
+
+    client.on("connect", () => {
+      console.log("Client connected with ID:", clientId);
+      console.log("Subscribing to publicTasks");
+      client.subscribe("publicTasks", { qos: 2, retain: true });
+    });
+
+    client.on("message", (topic, message) => {
+      const result = JSON.parse(message);
+      result.topic = topic;
+      if (result.payload)
+        result.payload.deadline = result.payload.deadline
+          ? dayjs(result.payload.deadline)
+          : undefined;
+
+      setParsedMessage(result);
+    });
+
+    client.on("close", () => console.log(`Client ${clientId} disconnected `));
+
+    return () => client.unsubscribe("publicTasks");
+  }, []);
 
   const onPageChange = (filter, page) => {
-    API.getTasks(filter, page).then((payload) => {
+    if (filter !== "public" && !user) return;
+
+    API.getTasks(filter, page, user).then((payload) => {
+      if (payload === 401) {
+        history.push("/list/public");
+        return;
+      }
+
       setTasks(payload.tasks);
-      //updateCorrectTaskList(filter, payload.tasks);
       setPageInfo(payload.pageInfo);
 
-      if (history.location.pathname.includes("public")) {
-        for (var i = 0; i < payload.tasks.length; i++) {
-          client.subscribe(String(payload.tasks[i].id), { qos: 2 });
-          console.log("Subscribing to public task " + payload.tasks[i].id);
+      if (client.connected) {
+        if (tasks.length !== 0) {
+          for (const { id } of tasks) {
+            client.unsubscribe(String(id));
+            console.log(`Unsubscribing to ${filter} task: ${id}`);
+          }
         }
-      }
-      if (filter === "assigned") {
-        for (var i = 0; i < payload.tasks.length; i++) {
-          client.subscribe(String(payload.tasks[i].id), {
-            qos: 0,
-            retain: true,
-          });
-          console.log("Subscribing to assigned " + payload.tasks[i].id);
+
+        for (const { id } of payload.tasks) {
+          client.subscribe(String(id), { qos: 2 });
+          console.log(`Subscribing to ${filter} task: ${id}`);
         }
       }
     });
@@ -309,13 +185,13 @@ const TaskManager = ({ onCheck, onlineList, loggedIn }) => {
 
   const onTaskDelete = (task) => {
     API.deleteTask(task)
-      .then(() => setRefetchTasks(true))
+      .then(() => onPageChange(filter, pageInfo.currentPage))
       .catch((e) => console.log(e));
   };
 
   const onTaskComplete = (task) => {
     API.completeTask(task)
-      .then(() => setRefetchTasks(true))
+      .then(() => onPageChange(filter, pageInfo.currentPage))
       .catch((e) => console.log(e));
   };
   const onTaskEdit = (task) => {
@@ -323,29 +199,29 @@ const TaskManager = ({ onCheck, onlineList, loggedIn }) => {
   };
 
   const onTaskCheck = (task) => {
-    API.selectTask(task)
-      .then(() => setRefetchTasks(true))
-      .catch((e) => {
-        alert("Task is already selected by another user!");
-        console.log(e);
-      });
+    API.selectTask(task, user.id)
+      .then(() => onPageChange(filter, pageInfo.currentPage))
+      .catch(() => alert("Task is already selected by another user!"));
   };
+
   const onSaveOrUpdate = (task) => {
     // if the task has an id it is an update
     if (task.id) {
       API.updateTask(task).then((response) => {
+        // prettier-ignore
         if (response.ok) {
-          API.getTasks(filter, pageInfo.currentPage).then((payload) => {
-            updateCorrectTaskList(filter, payload.tasks);
-            setTasks(payload.tasks);
-            setPageInfo(payload.pageInfo);
-          });
+          // Update the task in place so that the list does not get rerendered
+          const targetTask = tasks.find((t) => t.id === Number.parseInt(task.id));
+          for (const key in targetTask) {
+            targetTask[key] = task[key];
+          }
+          setTasks([...tasks]);
         }
       });
 
       // otherwise it is a new task to add
     } else {
-      API.addTask(task).then(() => setRefetchTasks(true));
+      API.addTask(task).then(() => onPageChange(filter, pageInfo.currentPage));
     }
     setSelectedTask(undefined);
   };
@@ -376,18 +252,18 @@ const TaskManager = ({ onCheck, onlineList, loggedIn }) => {
           onComplete={onTaskComplete}
           filter={filter}
           onPageChange={onPageChange}
-          assignedTaskList={assignedTaskList}
         />
       </Col>
-      <Button
-        variant="success"
-        size="lg"
-        className="fixed-right-bottom"
-        onClick={() => setSelectedTask({})}
-        disabled={!loggedIn}
-      >
-        +
-      </Button>
+      {loggedIn && (
+        <Button
+          variant="success"
+          size="lg"
+          className="fixed-right-bottom"
+          onClick={() => setSelectedTask({})}
+        >
+          +
+        </Button>
+      )}
 
       {selectedTask !== undefined && (
         <ModalForm

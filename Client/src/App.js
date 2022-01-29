@@ -23,13 +23,12 @@ import dayjs from "dayjs";
 import isToday from "dayjs/plugin/isToday";
 import isTomorrow from "dayjs/plugin/isTomorrow";
 import isYesterday from "dayjs/plugin/isYesterday";
-dayjs.extend(isToday).extend(isTomorrow).extend(isYesterday);
-const EventEmitter = require("events");
+import UserContext from "./contexts/UserContext";
 
-const handler = new EventEmitter();
+dayjs.extend(isToday).extend(isTomorrow).extend(isYesterday);
 
 const url = "ws://localhost:5000";
-let ws = new WebSocket(url);
+const ws = new WebSocket(url);
 
 const App = () => {
   return (
@@ -74,9 +73,10 @@ const Main = () => {
     };
 
     // check if user is authenticated
-    API.getUserInfo().then((authenticated) => {
-      if (authenticated) {
+    API.getUserInfo().then((user) => {
+      if (user) {
         setLoggedIn(true);
+        setUser(user);
       } else {
         console.log("Not logged");
       }
@@ -100,50 +100,47 @@ const Main = () => {
     // clean up everything
     setLoggedIn(false);
     setUser(null);
-    localStorage.removeItem("userId");
-    localStorage.removeItem("email");
-    localStorage.removeItem("username");
   };
 
   return (
-    <Container fluid>
-      <Row>
-        <Navigation onLogOut={handleLogOut} loggedIn={loggedIn} user={user} />
-      </Row>
+    <UserContext.Provider value={user}>
+      <Container fluid>
+        <Row>
+          <Navigation onLogOut={handleLogOut} loggedIn={loggedIn} user={user} />
+        </Row>
 
-      <Toast
-        show={message !== ""}
-        onClose={() => setMessage("")}
-        delay={3000}
-        autohide
-      >
-        <Toast.Body>{message?.msg}</Toast.Body>
-      </Toast>
+        <Toast
+          show={message !== ""}
+          onClose={() => setMessage("")}
+          delay={3000}
+          autohide
+        >
+          <Toast.Body>{message?.msg}</Toast.Body>
+        </Toast>
 
-      <Switch>
-        <Route path="/login">
-          <Row>
-            {loggedIn ? <Redirect to="/" /> : <LoginForm login={doLogIn} />}
-          </Row>
-        </Route>
-
-        <Route path="/online">
-          <Row>
-            <OnlineListManager userList={onlineList} />
-          </Row>
-        </Route>
-
-        <Route path="/assignment">
-          {loggedIn ? (
+        <Switch>
+          <Route path="/login">
             <Row>
-              <AssignmentsManager onlineList={onlineList} />
+              {loggedIn ? <Redirect to="/" /> : <LoginForm login={doLogIn} />}
             </Row>
-          ) : (
-            <Redirect to="/login" />
-          )}
-        </Route>
+          </Route>
 
-        {loggedIn ? (
+          <Route path="/online">
+            <Row>
+              <OnlineListManager userList={onlineList} />
+            </Row>
+          </Route>
+
+          <Route path="/assignment">
+            {loggedIn ? (
+              <Row>
+                <AssignmentsManager onlineList={onlineList} />
+              </Row>
+            ) : (
+              <Redirect to="/login" />
+            )}
+          </Route>
+
           <Route path={"/list/:filter"}>
             <Row>
               <TaskManager
@@ -152,46 +149,13 @@ const Main = () => {
               ></TaskManager>
             </Row>
           </Route>
-        ) : (
-          <Route path="/list/public">
-            <Row>
-              <TaskManager
-                onlineList={onlineList}
-                loggedIn={loggedIn}
-              ></TaskManager>
-            </Row>
+
+          <Route>
+            <Redirect to="/list/public"></Redirect>
           </Route>
-        )}
-        {/* <Route path="/list/public">
-          <Row>
-            <TaskManager onlineList={onlineList}></TaskManager>
-          </Row>
-
-        </Route> */}
-
-        {/* <Route path={"/list/:filter"}>
-          {loggedIn ? (
-            <Row>
-              <TaskManager onlineList={onlineList}></TaskManager>
-            </Row>
-          ) : (
-            <Redirect to="/login" />
-          )}
-        </Route> */}
-        {/* <Route path={"/list/assigned"}>
-          {loggedIn ? (
-            <Row>
-              <TaskManager onlineList={onlineList}></TaskManager>
-            </Row>
-          ) : (
-            <Redirect to="/login" />
-          )}
-        </Route> */}
-        <Route>
-          <Redirect to="/list/public"></Redirect>
-        </Route>
-      </Switch>
-    </Container>
+        </Switch>
+      </Container>
+    </UserContext.Provider>
   );
 };
 

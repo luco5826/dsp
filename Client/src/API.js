@@ -17,70 +17,54 @@ function getJson(httpResponsePromise) {
           response
             .json()
             .then((json) => resolve(json))
-            .catch((err) => reject({ error: "Cannot parse server response" }));
+            .catch((err) =>
+              reject({ error: "Cannot parse server response", err })
+            );
         } else {
           // analyze the cause of error
           response
             .json()
             .then((obj) => reject(obj)) // error msg in the response body
-            .catch((err) => reject({ error: "Cannot parse server response" })); // something else
+            .catch((err) =>
+              reject({ error: "Cannot parse server response", err })
+            ); // something else
         }
       })
       .catch((err) => reject({ error: "Cannot communicate" })); // connection error
   });
 }
 
-const getTasks = async (filter, page) => {
+const getTasks = async (filter, page, user) => {
   let url = BASEURL + "/tasks/public";
   if (filter === "owned") {
-    url =
-      BASEURL + "/users/" + localStorage.getItem("userId") + "/tasks/created";
+    url = `${BASEURL}/users/${user?.id || 0}/tasks/created`;
   } else if (filter === "assigned") {
-    url =
-      BASEURL + "/users/" + localStorage.getItem("userId") + "/tasks/assigned";
+    url = url = `${BASEURL}/users/${user?.id || 0}/tasks/assigned`;
   }
 
   if (page) {
     url += "?pageNo=" + page;
   }
-  return getJson(fetch(url)).then((json) => {
-    return {
-      pageInfo: {
-        totalItems: Number.parseInt(json.totalItems),
-        totalPages: Number.parseInt(json.totalPages),
-        currentPage: Number.parseInt(json.currentPage),
-      },
-      tasks: json.tasks.map((task) =>
-        Object.assign({}, task, {
-          deadline: task.deadline && dayjs(task.deadline),
-        })
-      ),
-    };
-  });
-};
+  const response = await fetch(url);
+  if (response.status !== 200) return response.status;
 
-const getPublicTasks = async (page) => {
-  let url = BASEURL + "/tasks/public";
-  if (page) {
-    url += "?pageNo=" + page;
-  }
-
-  return getJson(fetch(url)).then((json) => {
-    localStorage.setItem("totalPages", json.totalPages);
-    localStorage.setItem("currentPage", json.currentPage);
-    localStorage.setItem("totalItems", json.totalItems);
-    const tasksJson = json.tasks;
-    return tasksJson.map((task) =>
+  const json = await response.json();
+  return {
+    pageInfo: {
+      totalItems: Number.parseInt(json.totalItems),
+      totalPages: Number.parseInt(json.totalPages),
+      currentPage: Number.parseInt(json.currentPage),
+    },
+    tasks: json.tasks.map((task) =>
       Object.assign({}, task, {
         deadline: task.deadline && dayjs(task.deadline),
       })
-    );
-  });
+    ),
+  };
 };
 
-async function getAllOwnedTasks() {
-  let url =
-    BASEURL + "/users/" + localStorage.getItem("userId") + "/tasks/created";
+async function getAllOwnedTasks(userId) {
+  let url = `${BASEURL}/users/${userId}/tasks/created`;
   let allTasks = [];
   let finished = false;
 
@@ -158,15 +142,12 @@ async function completeTask(task) {
   }
 }
 
-async function selectTask(task) {
-  const response = await fetch(
-    BASEURL + "/users/" + localStorage.getItem("userId") + "/selection",
-    {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(task),
-    }
-  );
+async function selectTask(task, userId) {
+  const response = await fetch(`${BASEURL}/users/${userId}/selection`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(task),
+  });
   if (!response.ok) {
     let err = { status: response.status, errObj: response.json };
     throw err;
@@ -182,11 +163,7 @@ async function logIn(credentials) {
     body: JSON.stringify(credentials),
   });
   if (response.ok) {
-    const user = await response.json();
-    localStorage.setItem("userId", user.id);
-    localStorage.setItem("username", user.name);
-    localStorage.setItem("email", credentials.email);
-    return user;
+    return await response.json();
   } else {
     try {
       const errDetail = await response.json();
@@ -198,29 +175,14 @@ async function logIn(credentials) {
 }
 
 async function logOut() {
-  await fetch("/api/users/authenticator?type=logout", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email: localStorage.getItem("email"),
-      password: localStorage.getItem("password"),
-    }),
-  });
+  await fetch("/api/users/authenticator/logout");
 }
 
 async function getUserInfo() {
-  //const response = await fetch(BASEURL + '/sessions/current');
-  //const userInfo = await response.json();
-  if (localStorage.getItem("userId")) {
-    return true;
-  } else {
-    return false;
-  }
-  /*if (response.ok) {
-    return userInfo;
-  } else {
-    throw userInfo;  // an object with the error coming from the server, mostly unauthenticated user
-  }*/
+  const result = await fetch("/api/users/authenticator");
+  if (result.status === 401) return undefined;
+
+  return result.json();
 }
 
 async function getUsers() {
@@ -238,17 +200,12 @@ async function getUsers() {
 
 async function assignTask(userId, taskId) {
   return new Promise((resolve, reject) => {
-    //let userId = Number( localStorage.getItem("user"))
     fetch(BASEURL + "/tasks/" + taskId + "/assignees", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        id: userId,
-        email: localStorage.getItem("email"),
-        name: localStorage.getItem("username"),
-      }),
+      body: JSON.stringify({ id: userId }),
     })
       .then((response) => {
         if (response.ok) {
@@ -277,7 +234,6 @@ async function assignTask(userId, taskId) {
 
 async function removeAssignTask(userId, taskId) {
   return new Promise((resolve, reject) => {
-    //let userId = Number( localStorage.getItem("user"))
     fetch(BASEURL + "/tasks/" + taskId + "/assignees/" + userId, {
       method: "DELETE",
     })
@@ -309,7 +265,6 @@ async function removeAssignTask(userId, taskId) {
 const API = {
   addTask,
   getTasks,
-  getPublicTasks,
   getAllOwnedTasks,
   updateTask,
   deleteTask,
