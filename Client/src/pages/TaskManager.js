@@ -48,7 +48,7 @@ const TaskManager = ({ onlineList, loggedIn }) => {
     totalPages: 0,
     currentPage: 1,
   });
-  const [parsedMessage, setParsedMessage] = useState(undefined);
+  const [parsedMessages, setParsedMessages] = useState([]);
 
   const history = useHistory();
   const { filter } = useParams();
@@ -56,8 +56,9 @@ const TaskManager = ({ onlineList, loggedIn }) => {
   const user = useContext(UserContext);
 
   useEffect(() => {
-    if (parsedMessage === undefined) return;
+    if (parsedMessages.length === 0) return;
 
+    const parsedMessage = parsedMessages.shift();
     const { topic } = parsedMessage;
 
     switch (parsedMessage.operation) {
@@ -75,11 +76,11 @@ const TaskManager = ({ onlineList, loggedIn }) => {
 
         // Subscribe to receive update of the newer task
         console.log("TASK CREATED::Subscribing to task:", parsedMessage.taskId);
-        client.subscribe(parsedMessage.taskId.toString(), { qos: 2 });
+        client.subscribe(`task_${parsedMessage.taskId}`, { qos: 2 });
         break;
       case "DELETE":
         console.log("TASK DELETED::Unsubscribing from:", topic);
-        client.unsubscribe(topic);
+        client.unsubscribe(`task_${topic}`);
         if (filter === "public") {
           setTasks(
             tasks.filter((t) => t.id !== Number.parseInt(parsedMessage.taskId))
@@ -92,23 +93,27 @@ const TaskManager = ({ onlineList, loggedIn }) => {
           parsedMessage.status === "active" ||
           parsedMessage.status === "inactive"
         ) {
-          // Update the previously selected task by removing the username
-          const newTasks = tasks.map((t) =>
-            t.userName === parsedMessage.userName
-              ? { ...t, userName: "", status: "" }
-              : t
-          );
-
-          // Set the new task as the selected one by the userName
-          const task = newTasks.find(
+          // console.log("Message:", parsedMessage);
+          const task = tasks.find(
             (t) => t.id === Number.parseInt(parsedMessage.taskId)
           );
           if (!task) return;
-
-          task.userName = parsedMessage.userName;
-          task.status = parsedMessage.status;
-
-          setTasks(newTasks);
+          if (parsedMessage.status === "active") {
+            const oldTask = tasks.find(
+              (t) => t.userName === parsedMessage.userName
+            );
+            if (oldTask) {
+              oldTask.userName = "";
+              oldTask.status = "inactive";
+            }
+            task.userName = parsedMessage.userName;
+            task.status = parsedMessage.status;
+          } else {
+            // Update the previously selected task by removing the username
+            task.userName = "";
+            task.status = parsedMessage.status;
+          }
+          setTasks([...tasks]);
         } else {
           // Check if the task is public
           // prettier-ignore
@@ -127,8 +132,8 @@ const TaskManager = ({ onlineList, loggedIn }) => {
       default:
         break;
     }
-    setParsedMessage(undefined);
-  }, [parsedMessage, filter, tasks]);
+    setParsedMessages((old) => old.filter((m) => m !== parsedMessage));
+  }, [parsedMessages, filter, tasks]);
 
   useEffect(() => {
     onPageChange(filter, 1);
@@ -147,7 +152,7 @@ const TaskManager = ({ onlineList, loggedIn }) => {
     client.on("connect", () => {
       console.log("Client connected with ID:", clientId);
       console.log("Subscribing to publicTasks");
-      client.subscribe("publicTasks", { qos: 2, retain: true });
+      client.subscribe("task_public", { qos: 2, retain: true });
     });
 
     client.on("message", (topic, message) => {
@@ -158,12 +163,12 @@ const TaskManager = ({ onlineList, loggedIn }) => {
           ? dayjs(result.payload.deadline)
           : undefined;
 
-      setParsedMessage(result);
+      setParsedMessages((old) => [...old, result]);
     });
 
     client.on("close", () => console.log(`Client ${clientId} disconnected `));
 
-    return () => client.unsubscribe("publicTasks");
+    return () => client.unsubscribe("task_public");
   }, []);
 
   const onPageChange = (filter, page) => {
@@ -179,15 +184,15 @@ const TaskManager = ({ onlineList, loggedIn }) => {
       setPageInfo(payload.pageInfo);
 
       if (tasks.length !== 0) {
-        for (const { id } of tasks) {
-          client.unsubscribe(String(id));
-          console.log(`Unsubscribing to ${filter} task: ${id}`);
+        for (const task of tasks) {
+          client.unsubscribe(`task_${task.id}`);
+          console.log(`Unsubscribing to ${filter} task: ${task.id}`);
         }
       }
 
-      for (const { id } of payload.tasks) {
-        client.subscribe(String(id), { qos: 2 });
-        console.log(`Subscribing to ${filter} task: ${id}`);
+      for (const task of payload.tasks) {
+        client.subscribe(`task_${task.id}`, { qos: 2 });
+        console.log(`Subscribing to ${filter} task: ${task.id}`);
       }
     });
   };

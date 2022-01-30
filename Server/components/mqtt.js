@@ -30,30 +30,30 @@ mqtt_connection.on("error", function (err) {
 });
 
 //When the connection with the MQTT broker is established, a retained message for each task is sent
-mqtt_connection.on("connect", function () {
-  console.log("client connected:" + clientId);
-  // Assignments.getTaskSelections()
-  //   .then(function (selections) {
-  //     selections.forEach(function (selection) {
-  //       const status = selection.userId ? "active" : "inactive";
-  //       const message = new MQTTTaskMessage(
-  //         "UPDATE",
-  //         status,
-  //         selection.userId,
-  //         selection.userName,
-  //         selection.taskId
-  //       );
-  //       taskMessageMap.set(selection.taskId, message);
-  //       mqtt_connection.publish(
-  //         String(selection.taskId),
-  //         JSON.stringify(message),
-  //         { qos: 2, retain: true }
-  //       );
-  //     });
-  //   })
-  //   .catch(function (error) {
-  //     mqtt_connection.end();
-  //   });
+mqtt_connection.on("connect", () => {
+  console.log("client connected:", clientId);
+  Assignments.getTaskSelections()
+    .then((selections) => {
+      selections.forEach((selection) => {
+        const message = new MQTTTaskMessage(
+          "UPDATE",
+          selection.userId ? "active" : "inactive",
+          selection.userId,
+          selection.userName,
+          selection.taskId
+        );
+        // taskMessageMap.set(selection.taskId, message);
+        mqtt_connection.publish(
+          `task_${selection.taskId}`,
+          JSON.stringify(message),
+          { qos: 2, retain: true }
+        );
+      });
+    })
+    .catch((error) => {
+      console.error(error);
+      mqtt_connection.end();
+    });
 });
 
 mqtt_connection.on("close", function () {
@@ -62,9 +62,10 @@ mqtt_connection.on("close", function () {
 
 module.exports.publishTaskMessage = function publishTaskMessage(
   topic,
-  message
+  message,
+  options
 ) {
-  mqtt_connection.publish(topic, JSON.stringify(message));
+  mqtt_connection.publish(`task_${topic}`, JSON.stringify(message), options);
 };
 
 module.exports.saveMessage = function saveMessage(taskId, message) {

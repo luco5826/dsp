@@ -58,7 +58,7 @@ exports.addTask = function (task, owner) {
               createdTask
             );
             mqtt.saveMessage(this.lastID, message);
-            mqtt.publishTaskMessage("publicTasks", message);
+            mqtt.publishTaskMessage("public", message);
             mqtt.publishTaskMessage(String(this.lastID), message);
           }
           resolve(createdTask);
@@ -389,7 +389,7 @@ exports.updateSingleTask = function (task, taskId, owner) {
             );
 
             mqtt.publishTaskMessage(
-              status === "public" ? "publicTasks" : String(task.id),
+              status === "public" ? "public" : String(task.id),
               message
             );
 

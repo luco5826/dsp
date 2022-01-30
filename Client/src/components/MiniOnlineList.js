@@ -16,9 +16,7 @@ const MiniOnlineList = ({ onlineList }) => {
         />
       </h3>
       {onlineList.map((user) => (
-        <ListGroup.Item
-          key={user.userId}
-        >{`${user.userId} - ${user.userName}`}</ListGroup.Item>
+        <ListGroup.Item key={user.userId}>{`${user.userName}`}</ListGroup.Item>
       ))}
     </ListGroup>
   );

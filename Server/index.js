@@ -100,7 +100,6 @@ app.put(
 app.post(
   "/api/tasks/:taskId/assignees",
   passport.authenticate("jwt", { session: false }),
-  validate({ body: userSchema }),
   assignmentController.assignTaskToUser
 );
 app.get(
