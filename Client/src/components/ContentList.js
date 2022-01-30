@@ -93,19 +93,16 @@ const ContentList = ({
   return (
     <>
       <ListGroup>
-        {tasks.map((task, index) => (
+        {tasks?.map((task, index) => (
           <ListGroup.Item
             key={index}
             className="d-flex justify-content-between align-items-center"
           >
             <TaskRowData
               task={task}
-              onCheck={(flag) => {
-                onCheck(task, flag);
-                console.log("Selected task:" + task);
-              }}
+              onCheck={(flag) => onCheck(task, flag)}
               filter={filter}
-              owner={""}
+              owner={task.userName ?? ""}
             />
             <TaskRowControl
               task={task}
@@ -121,12 +118,12 @@ const ContentList = ({
         <Pagination
           itemClass="page-item" // add it for bootstrap 4
           linkClass="page-link" // add it for bootstrap 4
-          activePage={pageInfo.currentPage}
+          activePage={pageInfo?.currentPage || 1}
           itemsCountPerPage={10}
-          totalItemsCount={pageInfo.totalItems}
+          totalItemsCount={pageInfo?.totalItems || 0}
           pageRangeDisplayed={10}
           onChange={handlePageChange}
-          pageSize={pageInfo.totalPages}
+          pageSize={pageInfo?.totalPages || 1}
         />
       </div>
     </>

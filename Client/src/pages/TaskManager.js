@@ -30,9 +30,14 @@ const options = {
 
 const client = mqtt.connect(host, options);
 const filters = {
-  owned: { label: "Owned Tasks", id: "owned" },
-  assigned: { label: "Assigned Tasks", id: "assigned" },
-  public: { label: "Public Tasks", id: "public" },
+  logged: {
+    owned: { label: "Owned Tasks", id: "owned" },
+    assigned: { label: "Assigned Tasks", id: "assigned" },
+    public: { label: "Public Tasks", id: "public" },
+  },
+  nonLogged: {
+    public: { label: "Public Tasks", id: "public" },
+  },
 };
 
 const TaskManager = ({ onlineList, loggedIn }) => {
@@ -87,17 +92,23 @@ const TaskManager = ({ onlineList, loggedIn }) => {
           parsedMessage.status === "active" ||
           parsedMessage.status === "inactive"
         ) {
-          // Selection/Deselection of task
-          var index = tasks.findIndex((x) => x.taskId === parseInt(topic));
-          let objectStatus = {
-            taskId: parseInt(topic),
-            userName: parsedMessage.userName,
-            status: parsedMessage.status,
-          };
-          var temp = tasks;
-          index === -1 ? temp.push(objectStatus) : (temp[index] = objectStatus);
+          // Update the previously selected task by removing the username
+          const newTasks = tasks.map((t) =>
+            t.userName === parsedMessage.userName
+              ? { ...t, userName: "", status: "" }
+              : t
+          );
 
-          setTasks(temp);
+          // Set the new task as the selected one by the userName
+          const task = newTasks.find(
+            (t) => t.id === Number.parseInt(parsedMessage.taskId)
+          );
+          if (!task) return;
+
+          task.userName = parsedMessage.userName;
+          task.status = parsedMessage.status;
+
+          setTasks(newTasks);
         } else {
           // Check if the task is public
           // prettier-ignore
@@ -198,7 +209,13 @@ const TaskManager = ({ onlineList, loggedIn }) => {
 
   const onTaskCheck = (task) => {
     API.selectTask(task, user.id)
-      .then(() => onPageChange(filter, pageInfo.currentPage))
+      .then(() =>
+        setTasks(
+          tasks
+            .map((t) => ({ ...t, active: false }))
+            .map((t) => (t.id === task.id ? { ...t, active: true } : t))
+        )
+      )
       .catch(() => alert("Task is already selected by another user!"));
   };
 
@@ -231,7 +248,7 @@ const TaskManager = ({ onlineList, loggedIn }) => {
       {/* Available filters sidebar */}
       <Col sm={3} id="left-sidebar">
         <Filters
-          items={filters}
+          items={loggedIn ? filters.logged : filters.nonLogged}
           defaultActiveKey={filter}
           onSelect={onFilterSelect}
         />

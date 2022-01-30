@@ -59,7 +59,7 @@ const Main = () => {
       const { typeMessage, userId, userName, taskId, taskName } = JSON.parse(
         message.data
       );
-      console.log("WS message:" + JSON.parse(message.data));
+      console.log("WS message:", JSON.parse(message.data));
       if (typeMessage === "login" || typeMessage === "update") {
         setOnlineList((list) => {
           return [
