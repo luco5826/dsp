@@ -425,6 +425,16 @@ exports.completeTask = function (taskId, assignee) {
       db.run(sql2, [taskId], function (err) {
         if (err) return reject(err);
 
+        const message = new MQTTMessage(
+          "UPDATE",
+          "completed",
+          null,
+          null,
+          taskId
+        );
+
+        mqtt.publishTaskMessage(String(taskId), message);
+
         resolve(null);
       });
     });

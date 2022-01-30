@@ -4,7 +4,6 @@
   "title": "Task",
   "description": "JSON Schema for Task objects",
   "type": "object",
-  "additionalProperties": false,
   "properties": {
     "$schema": {
       "type": "string",

@@ -114,6 +114,14 @@ const TaskManager = ({ onlineList, loggedIn }) => {
             task.status = parsedMessage.status;
           }
           setTasks([...tasks]);
+        } else if (parsedMessage.status === "completed") {
+          if (filter === "public") {
+            const targetTask = tasks.find(
+              (t) => t.id === Number.parseInt(parsedMessage.taskId)
+            );
+            targetTask.completed = true;
+            setTasks([...tasks]);
+          }
         } else {
           // Check if the task is public
           // prettier-ignore
