@@ -150,8 +150,8 @@ exports.selectTask = function selectTask(userId, taskId) {
               db.run("ROLLBACK;");
               reject(err);
             } else {
-              var deselected = null;
-              if (rows1.length !== 0) deselected = rows1[0].id;
+              var deselectedTask = null;
+              if (rows1.length !== 0) deselectedTask = rows1[0].id;
               const sql3 =
                 "SELECT u.name, t.description FROM assignments as a, users as u, tasks as t WHERE a.user = ? AND a.task = ? AND a.user = u.id AND a.task = t.id";
               db.all(sql3, [userId, taskId], function (err, rows2) {
@@ -182,36 +182,43 @@ exports.selectTask = function selectTask(userId, taskId) {
                             db.run("COMMIT TRANSACTION");
 
                             //publish the MQTT message for the selected task
-                            const message = new MQTTMessage(
+                            const activeTaskMessage = new MQTTMessage(
                               "UPDATE",
                               "active",
-                              parseInt(userId),
+                              Number.parseInt(userId),
                               rows2[0].name,
                               taskId,
                               null
                             );
                             //var message = new MQTTMessage("active", parseInt(userId), rows2[0].name);
-                            mqtt.saveMessage(taskId, message);
-                            mqtt.publishTaskMessage(String(taskId), message, {
-                              qos: 2,
-                              retain: true,
-                            });
+                            mqtt.saveMessage(taskId, activeTaskMessage);
+                            mqtt.publishTaskMessage(
+                              String(taskId),
+                              activeTaskMessage,
+                              {
+                                qos: 2,
+                                retain: true,
+                              }
+                            );
 
                             //publish the MQTT message for the selected task
-                            if (deselected) {
-                              const message2 = new MQTTMessage(
+                            if (deselectedTask) {
+                              const inactiveTaskMessage = new MQTTMessage(
                                 "UPDATE",
                                 "inactive",
                                 null,
                                 null,
-                                parseInt(taskId),
+                                Number.parseInt(deselectedTask),
                                 null
                               );
                               //var message = new MQTTMessage("inactive", null, null);
-                              mqtt.saveMessage(deselected, message);
+                              mqtt.saveMessage(
+                                deselectedTask,
+                                inactiveTaskMessage
+                              );
                               mqtt.publishTaskMessage(
-                                String(deselected),
-                                message,
+                                String(deselectedTask),
+                                inactiveTaskMessage,
                                 { qos: 2, retain: true }
                               );
                             }

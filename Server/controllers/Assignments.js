@@ -118,8 +118,8 @@ module.exports.removeUser = function removeUser(req, res, next) {
 };
 
 module.exports.selectTask = function selectTask(req, res, next) {
-  var userId = req.params.userId;
-  var taskId = req.body.id;
+  const userId = req.params.userId;
+  const taskId = req.body.id;
   if (taskId == undefined) {
     utils.writeJson(
       res,

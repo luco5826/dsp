@@ -1,4 +1,4 @@
-openapi: 3.0.1
+openapi: '3.0.0'
 info:
   title: Swagger ToDo Manager
   description: REST APIs for the interaction with the ToDo Manager service.
@@ -21,11 +21,11 @@ tags:
   - name: "tasks/{taskId}"
     description: resource representing a single task
   - name: "tasks/{taskId}/assignees"
-    description: >-
+    description: |
       resource representing the users to which the task with ID taskID is
       assigned
   - name: "tasks/{taskId}/assignees/{userId}"
-    description: >-
+    description: |
       resource representing one user to which the task with ID taskID is
       assigned
   - name: "tasks/{taskId}/completion"
@@ -50,7 +50,7 @@ paths:
       tags:
         - tasks/public
       summary: Retrieve the public tasks
-      description: >-
+      description: |
         The public tasks (i.e., the tasks that are visible for all the users of the service) are retrieved. This operation does not require authentication. A pagination mechanism is implemented to limit the size of messages.
       operationId: getPublicTasks
       parameters:
@@ -325,22 +325,15 @@ paths:
     post:
       tags:
         - users/authenticator
-      summary: Logs a user in or out
+      summary: Logs a user in
       description: >-
-        The user who wants to log in or out sends the user data to the
+        The user who wants to log in sends the user data to the
         authenticator which performs the operation.
       operationId: authenticateUser
-      parameters:
-        - in: query
-          name: type
-          schema:
-            type: string
-          description: The operation type ("login" or "logout")
       requestBody:
         description: >-
-          The data of the user who wants to perform log in or log out. For login
-          the structure must contain email and password. For logout, the
-          structure must contain the user id.
+          The data of the user who wants to perform log in. The data 
+          structure must contain email and password.
         content:
           application/json:
             schema:
@@ -362,6 +355,44 @@ paths:
           content: {}
         "404":
           description: Not found - Wrong username
+          content: {}
+    get:
+      tags:
+        - users/authenticator
+      summary: Retrieve informations for the logged in user
+      description: >-
+        The client sends a GET to this endpoint with the authentication cookie 
+        inside it and the backend answers with the login informations
+      operationId: isUserAuthenticated
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Bad Request
+          content: {}
+        "401":
+          description: Unauthorized - User is not logged in
+          content: {}
+  '/api/users/authenticator/logout':
+    get:
+      tags:
+        - users/authenticator
+      summary: Logs a user out
+      description: |
+        The user who wants to log out sends a request with the 
+        authentication cookie to the authenticator which 
+        performs the operation.
+      operationId: logoutUser
+      responses:
+        '200':
+          description: OK - User logged out
+          content: {}
+        '401':
+          description: Unauthorized - User is not logged in
           content: {}
   "/api/tasks/{taskId}/assignees":
     post:
@@ -642,7 +673,7 @@ paths:
       summary: Select a task as the active task
       description: >-
         The task that is included in the request body is labeled as the acrive task for the user with ID userId.
-      operationId: removeUser
+      operationId: selectTask
       parameters:
         - name: userId
           in: path

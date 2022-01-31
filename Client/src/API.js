@@ -155,7 +155,7 @@ async function selectTask(task, userId) {
 }
 
 async function logIn(credentials) {
-  let response = await fetch("/api/users/authenticator?type=login", {
+  const response = await fetch("/api/users/authenticator", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

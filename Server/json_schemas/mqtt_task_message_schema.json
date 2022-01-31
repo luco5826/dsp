@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id" : "http://www.my-schema.com/mqtt_message_schema.json",
+  "$id": "http://www.my-schema.com/mqtt_message_schema_v2.json",
   "title": "MQTT Message",
   "description": "JSON Schema for MQTT Message",
   "type": "object",
@@ -10,28 +10,64 @@
       "type": "string",
       "description": "path to the JSON Schema to use for the validation of the JSON file describing the MQTT Message"
     },
+    "operation": {
+      "type": "string",
+      "description": "Type of operation performed on the task: Creation or set to public (CREATE), Deletion or set to private (DELETE), Modifications e.g deadline update (UPDATE)",
+      "enum": ["CREATE", "DELETE", "UPDATE"]
+    },
     "status": {
       "type": "string",
-      "description": "current condition of the task (the available types are active if it is selected by a user, inactive if it is not selected by any user, or deleted if it has been removed from the service)",
-      "enum": ["active", "inactive", "deleted"]
+      "description": "Status of the task in case of an UPDATE operation: active/inactive the task has been selected/deselected, completed when task is completed, other when informations about the task change",
+      "enum": ["active", "inactive", "completed", "other"]
     },
     "userId": {
       "type": "integer",
-      "description": "identified of the user"
+      "description": "ID of the user that selected the task"
     },
     "userName": {
       "type": "string",
-      "description": "name of the user"
+      "description": "Username of the user that selected the task"
+    },
+    "taskId": {
+      "type": "integer",
+      "description": "ID of the selected/deselected task"
+    },
+    "payload": {
+      "$ref": "./task_schema.json#"
     }
   },
-  "required": ["status"],
+  "required": ["operation"],
   "allOf": [
     {
       "if": {
-        "properties": { "typeMessage": { "const": "active" } }
+        "properties": { "operation": { "const": "CREATE" } }
       },
       "then": {
-        "required": ["userId", "userName"]
+        "required": ["payload"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "operation": { "const": "UPDATE" } }
+      },
+      "then": {
+        "required": ["status"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "active" } }
+      },
+      "then": {
+        "required": ["userId", "userName", "taskId"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "inactive" } }
+      },
+      "then": {
+        "required": ["taskId"]
       }
     }
   ]

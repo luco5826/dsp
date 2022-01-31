@@ -89,6 +89,7 @@ const TaskManager = ({ onlineList, loggedIn }) => {
         break;
       case "UPDATE":
         console.log("TASK UPDATED::", parsedMessage.taskId);
+
         if (
           parsedMessage.status === "active" ||
           parsedMessage.status === "inactive"
@@ -98,6 +99,7 @@ const TaskManager = ({ onlineList, loggedIn }) => {
             (t) => t.id === Number.parseInt(parsedMessage.taskId)
           );
           if (!task) return;
+
           if (parsedMessage.status === "active") {
             const oldTask = tasks.find(
               (t) => t.userName === parsedMessage.userName

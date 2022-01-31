@@ -17,7 +17,7 @@ exports.getUserByEmail = function (email) {
   return new Promise((resolve, reject) => {
     const sql = "SELECT * FROM users WHERE email = ?";
     db.all(sql, [email], (err, rows) => {
-      if (err) reject(err);
+      if (err) return reject(err);
       if (rows.length === 0) return resolve(undefined);
 
       resolve(createUser(rows[0]));
@@ -98,6 +98,5 @@ exports.getActiveTaskUser = function (userId) {
  */
 const createUser = (row) => new User(row.id, row.name, row.email, row.hash);
 
-exports.checkPassword = function (user, password) {
-  return bcrypt.compareSync(password, user.hash);
-};
+exports.checkPassword = (user, password) =>
+  bcrypt.compareSync(password, user.hash);

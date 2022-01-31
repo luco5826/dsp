@@ -1,14 +1,13 @@
 "use strict";
 
-var passport = require("passport");
+const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
-var utils = require("../utils/writer.js");
-var Users = require("../service/UsersService");
-var WebSocket = require("../components/websocket");
-var WSMessage = require("../components/ws_message.js");
-var jsonwebtoken = require("jsonwebtoken");
-var jwtSecret =
-  "6xvL4xkAAbG49hcXf5GIYSvkDICiUAR6EdR5dLdwW7hMzUjjMUe9t6M5kSAYxsvX";
+const utils = require("../utils/writer.js");
+const Users = require("../service/UsersService");
+const WebSocket = require("../components/websocket");
+const WSMessage = require("../components/ws_message.js");
+const jsonwebtoken = require("jsonwebtoken");
+const { jwtSecret } = require("../secrets");
 
 passport.use(
   new LocalStrategy(
@@ -48,36 +47,36 @@ module.exports.logoutUser = function logoutUser(req, res, next) {
 };
 
 module.exports.authenticateUser = function authenticateUser(req, res, next) {
-  if (req.query.type == "login") {
-    passport.authenticate("local", { session: false }, (err, user, info) => {
+  passport.authenticate("local", { session: false }, (err, user, info) => {
+    if (err) return next(err);
+    if (!user) {
+      // display wrong login messages
+      return res.status(401).json(info);
+    }
+    // success, perform the login
+    req.login(user, { session: false }, (err) => {
       if (err) return next(err);
-      if (!user) {
-        // display wrong login messages
-        return res.status(401).json(info);
-      }
-      // success, perform the login
-      req.login(user, { session: false }, (err) => {
-        if (err) return next(err);
 
-        //notify all the clients that a user has logged in the service
-        Users.getActiveTaskUser(user.id).then((task) => {
-          const loginMessage = new WSMessage(
-            "login",
-            user.id,
-            user.name,
-            task ? task.id : undefined,
-            task ? task.description : undefined
-          );
-          WebSocket.sendAllClients(loginMessage);
-          WebSocket.saveMessage(user.id, loginMessage);
+      //notify all the clients that a user has logged in the service
+      Users.getActiveTaskUser(user.id).then((task) => {
+        const loginMessage = new WSMessage(
+          "login",
+          user.id,
+          user.name,
+          task ? task.id : undefined,
+          task ? task.description : undefined
+        );
+        WebSocket.sendAllClients(loginMessage);
+        WebSocket.saveMessage(user.id, loginMessage);
 
-          const token = jsonwebtoken.sign({ user: user.id }, jwtSecret);
-          res.cookie("jwt", token, { httpOnly: true, sameSite: true });
-          return res.json({ id: user.id, name: user.name });
+        res.cookie("jwt", jsonwebtoken.sign({ user: user.id }, jwtSecret), {
+          httpOnly: true,
+          sameSite: true,
         });
+        return res.json({ id: user.id, name: user.name });
       });
-    })(req, res, next);
-  }
+    });
+  })(req, res, next);
 };
 
 module.exports.isUserAuthenticated = function isUserAuthenticated(req, res) {
@@ -86,13 +85,9 @@ module.exports.isUserAuthenticated = function isUserAuthenticated(req, res) {
 
 module.exports.getUsers = function getUsers(req, res, next) {
   Users.getUsers()
-    .then(function (response) {
-      if (!response) {
-        utils.writeJson(res, response, 404);
-      } else {
-        utils.writeJson(res, response);
-      }
-    })
+    .then((response) =>
+      utils.writeJson(res, response, response ? undefined : 404)
+    )
     .catch(function (response) {
       utils.writeJson(
         res,
@@ -104,13 +99,9 @@ module.exports.getUsers = function getUsers(req, res, next) {
 
 module.exports.getSingleUser = function getSingleUser(req, res, next) {
   Users.getUserById(req.params.userId)
-    .then(function (response) {
-      if (!response) {
-        utils.writeJson(res, response, 404);
-      } else {
-        utils.writeJson(res, response);
-      }
-    })
+    .then((response) =>
+      utils.writeJson(res, response, response ? undefined : 404)
+    )
     .catch(function (response) {
       utils.writeJson(
         res,

@@ -1,45 +1,40 @@
 "use strict";
 
-var path = require("path");
-var http = require("http");
-var fs = require("fs");
-var passport = require("passport");
-var {
+const path = require("path");
+const http = require("http");
+const fs = require("fs");
+const passport = require("passport");
+const {
   Validator,
   ValidationError,
 } = require("express-json-validator-middleware");
 
-var oas3Tools = require("oas3-tools");
-var serverPort = process.env.PORT || 3001;
+const oas3Tools = require("oas3-tools");
+const SERVER_PORT = process.env.PORT || 3001;
 
-var taskController = require(path.join(__dirname, "controllers/Tasks"));
-var userController = require(path.join(__dirname, "controllers/Users"));
-var assignmentController = require(path.join(
-  __dirname,
-  "controllers/Assignments"
-));
+const { jwtSecret } = require("./secrets");
 
-// swaggerRouter configuration
-var options = {
+const TaskController = require("./controllers/Tasks");
+const UserController = require("./controllers/Users");
+const AssignmentController = require("./controllers/Assignments");
+
+const expressAppConfig = oas3Tools.expressAppConfig("api/openapi.yaml", {
   controllers: path.join(__dirname, "./controllers"),
-};
-var expressAppConfig = oas3Tools.expressAppConfig(
-  path.join(__dirname, "api/openapi.yaml"),
-  options
-);
+});
 expressAppConfig.addValidator();
-var app = expressAppConfig.getApp();
+const app = expressAppConfig.getApp();
 
 // Set validator middleware
-var taskSchema = JSON.parse(
-  fs.readFileSync(path.join(".", "json_schemas", "task_schema.json")).toString()
+const taskSchema = JSON.parse(
+  fs.readFileSync("json_schemas/task_schema.json").toString()
 );
-var userSchema = JSON.parse(
-  fs.readFileSync(path.join(".", "json_schemas", "user_schema.json")).toString()
+const userSchema = JSON.parse(
+  fs.readFileSync("json_schemas/user_schema.json").toString()
 );
-var validator = new Validator({ allErrors: true });
-validator.ajv.addSchema([userSchema, taskSchema]);
-var validate = validator.validate;
+const validator = new Validator({
+  allErrors: true,
+  schemas: [userSchema, taskSchema],
+});
 
 //Set authentication middleware
 app.use(passport.initialize());
@@ -47,100 +42,98 @@ app.use(passport.initialize());
 const JwtStrategy = require("passport-jwt").Strategy;
 const strategyOptions = {
   jwtFromRequest: (req) => (req && req.cookies ? req.cookies["jwt"] : null),
-  secretOrKey:
-    "6xvL4xkAAbG49hcXf5GIYSvkDICiUAR6EdR5dLdwW7hMzUjjMUe9t6M5kSAYxsvX",
+  secretOrKey: jwtSecret,
 };
 passport.use(
-  new JwtStrategy(strategyOptions, function (jwt_payload, done) {
-    return done(null, jwt_payload.user);
-  })
+  new JwtStrategy(strategyOptions, (jwt_payload, done) =>
+    done(null, jwt_payload.user)
+  )
 );
 
 //route methods
-
-app.post("/api/users/authenticator", userController.authenticateUser);
-app.get(
-  "/api/users/authenticator/logout",
-  passport.authenticate("jwt", { session: false }),
-  userController.logoutUser
-);
+app.post("/api/users/authenticator", UserController.authenticateUser);
 app.get(
   "/api/users/authenticator",
   passport.authenticate("jwt", { session: false }),
-  userController.isUserAuthenticated
+  UserController.isUserAuthenticated
 );
-app.get("/api/tasks/public", taskController.getPublicTasks);
+app.get(
+  "/api/users/authenticator/logout",
+  passport.authenticate("jwt", { session: false }),
+  UserController.logoutUser
+);
+app.get("/api/tasks/public", TaskController.getPublicTasks);
 app.post(
   "/api/tasks",
   passport.authenticate("jwt", { session: false }),
-  validate({ body: taskSchema }),
-  taskController.addTask
+  validator.validate({ body: taskSchema }),
+  TaskController.addTask
 );
 app.get(
   "/api/tasks/:taskId",
   passport.authenticate("jwt", { session: false }),
-  taskController.getSingleTask
+  TaskController.getSingleTask
 );
 app.delete(
   "/api/tasks/:taskId",
   passport.authenticate("jwt", { session: false }),
-  taskController.deleteTask
+  TaskController.deleteTask
 );
 app.put(
   "/api/tasks/:taskId",
   passport.authenticate("jwt", { session: false }),
-  validate({ body: taskSchema }),
-  taskController.updateSingleTask
+  validator.validate({ body: taskSchema }),
+  TaskController.updateSingleTask
 );
 app.put(
   "/api/tasks/:taskId/completion",
   passport.authenticate("jwt", { session: false }),
-  taskController.completeTask
+  TaskController.completeTask
 );
 app.post(
   "/api/tasks/:taskId/assignees",
   passport.authenticate("jwt", { session: false }),
-  assignmentController.assignTaskToUser
+  AssignmentController.assignTaskToUser
 );
 app.get(
   "/api/tasks/:taskId/assignees",
   passport.authenticate("jwt", { session: false }),
-  assignmentController.getUsersAssigned
+  AssignmentController.getUsersAssigned
 );
 app.delete(
   "/api/tasks/:taskId/assignees/:userId",
   passport.authenticate("jwt", { session: false }),
-  assignmentController.removeUser
+  AssignmentController.removeUser
 );
 app.post(
   "/api/tasks/assignments",
   passport.authenticate("jwt", { session: false }),
-  assignmentController.assignAutomatically
+  AssignmentController.assignAutomatically
 );
 app.get(
   "/api/users",
   passport.authenticate("jwt", { session: false }),
-  userController.getUsers
+  UserController.getUsers
 );
 app.get(
   "/api/users/:userId",
   passport.authenticate("jwt", { session: false }),
-  userController.getSingleUser
+  UserController.getSingleUser
 );
 app.get(
   "/api/users/:userId/tasks/created",
   passport.authenticate("jwt", { session: false }),
-  taskController.getOwnedTasks
+  TaskController.getOwnedTasks
 );
 app.get(
   "/api/users/:userId/tasks/assigned",
   passport.authenticate("jwt", { session: false }),
-  taskController.getAssignedTasks
+  TaskController.getAssignedTasks
 );
 app.put(
   "/api/users/:userId/selection",
   passport.authenticate("jwt", { session: false }),
-  assignmentController.selectTask
+  AssignmentController.selectTask
 );
 
 // Error handlers for validation and authentication errors
@@ -153,22 +146,21 @@ app.use(function (err, req, res, next) {
 
 app.use(function (err, req, res, next) {
   if (err.name === "UnauthorizedError") {
-    var authErrorObj = {
+    res.status(401).json({
       errors: [{ param: "Server", msg: "Authorization error" }],
-    };
-    res.status(401).json(authErrorObj);
+    });
   } else next(err);
 });
 
 // Initialize the Swagger middleware
-http.createServer(app).listen(serverPort, function () {
+http.createServer(app).listen(SERVER_PORT, function () {
   console.log(
     "Your server is listening on port %d (http://localhost:%d)",
-    serverPort,
-    serverPort
+    SERVER_PORT,
+    SERVER_PORT
   );
   console.log(
     "Swagger-ui is available on http://localhost:%d/docs",
-    serverPort
+    SERVER_PORT
   );
 });

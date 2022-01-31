@@ -1,13 +1,12 @@
 "use strict";
 
-var utils = require("../utils/writer.js");
-var constants = require("../utils/constants.js");
-var Tasks = require("../service/TasksService.js");
-var Assignments = require("../service/AssignmentsService.js");
+const utils = require("../utils/writer.js");
+const constants = require("../utils/constants.js");
+const Tasks = require("../service/TasksService.js");
 
 module.exports.addTask = function addTask(req, res, next) {
-  var task = req.body;
-  var owner = req.user;
+  const task = req.body;
+  const owner = req.user;
   Tasks.addTask(task, owner)
     .then(function (response) {
       utils.writeJson(res, response, 201);
@@ -121,16 +120,14 @@ module.exports.getSingleTask = function getSingleTask(req, res, next) {
 };
 
 module.exports.getPublicTasks = async function getPublicTasks(req, res, next) {
-  var numOfTasks = 0;
-  var next = 0;
-  var numOfTasks = await Tasks.getPublicTasksTotal();
+  const numOfTasks = await Tasks.getPublicTasksTotal();
 
   Tasks.getPublicTasks(req)
     .then(function (response) {
-      if (req.query.pageNo == null) var pageNo = 1;
-      else var pageNo = req.query.pageNo;
-      var totalPage = Math.ceil(numOfTasks / constants.OFFSET);
-      next = Number(pageNo) + 1;
+      const pageNo =
+        req.query.pageNo == null ? 1 : Number.parseInt(req.query.pageNo);
+      const totalPage = Math.ceil(numOfTasks / constants.OFFSET);
+      const next = Number(pageNo) + 1;
 
       if (pageNo > totalPage) {
         utils.writeJson(
@@ -181,16 +178,14 @@ module.exports.getOwnedTasks = async function getUserTasks(req, res, next) {
     return;
   }
 
-  var next = 0;
-
   const numOfTasks = await Tasks.getOwnedTasksTotal(req);
 
   Tasks.getOwnedTasks(req).then(function (response) {
-    if (req.query.pageNo == null) var pageNo = 1;
-    else var pageNo = req.query.pageNo;
-    var totalPage = Math.ceil(numOfTasks / constants.OFFSET);
+    const pageNo =
+      req.query.pageNo == null ? 1 : Number.parseInt(req.query.pageNo);
+    const totalPage = Math.ceil(numOfTasks / constants.OFFSET);
 
-    next = Number(pageNo) + 1;
+    const next = pageNo + 1;
 
     if (pageNo > totalPage) {
       utils.writeJson(
@@ -240,18 +235,14 @@ module.exports.getAssignedTasks = async function getAssignedTasks(
     return;
   }
 
-  var next = 0;
-
   const numOfTasks = await Tasks.getAssignedTasksTotal(req);
 
   Tasks.getAssignedTasks(req).then(function (response) {
-    let pageNo = 1;
-    if (req.query.pageNo !== undefined)
-      pageNo = Number.parseInt(req.query.pageNo);
+    const pageNo =
+      req.query.pageNo == null ? 1 : Number.parseInt(req.query.pageNo);
 
     const totalPages = Math.ceil(numOfTasks / constants.OFFSET);
-
-    next = Number.parseInt(pageNo) + 1;
+    const next = pageNo + 1;
 
     if (pageNo > totalPages) {
       utils.writeJson(
@@ -282,9 +273,7 @@ module.exports.getAssignedTasks = async function getAssignedTasks(
 
 module.exports.completeTask = function completeTask(req, res, next) {
   Tasks.completeTask(req.params.taskId, req.user)
-    .then(function (response) {
-      utils.writeJson(res, response, 204);
-    })
+    .then((response) => utils.writeJson(res, response, 204))
     .catch(function (response) {
       if (response == 403) {
         utils.writeJson(
