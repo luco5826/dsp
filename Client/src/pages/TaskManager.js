@@ -76,7 +76,7 @@ const TaskManager = ({ onlineList, loggedIn }) => {
 
         // Subscribe to receive update of the newer task
         console.log("TASK CREATED::Subscribing to task:", parsedMessage.taskId);
-        client.subscribe(`task_${parsedMessage.taskId}`, { qos: 2 });
+        client.subscribe(`task_${parsedMessage.taskId}`);
         break;
       case "DELETE":
         console.log("TASK DELETED::Unsubscribing from:", topic);
@@ -162,7 +162,7 @@ const TaskManager = ({ onlineList, loggedIn }) => {
     client.on("connect", () => {
       console.log("Client connected with ID:", clientId);
       console.log("Subscribing to publicTasks");
-      client.subscribe("task_public", { qos: 2, retain: true });
+      client.subscribe("task_public");
     });
 
     client.on("message", (topic, message) => {
@@ -201,7 +201,7 @@ const TaskManager = ({ onlineList, loggedIn }) => {
       }
 
       for (const task of payload.tasks) {
-        client.subscribe(`task_${task.id}`, { qos: 2 });
+        client.subscribe(`task_${task.id}`);
         console.log(`Subscribing to ${filter} task: ${task.id}`);
       }
     });
